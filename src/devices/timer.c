@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <list.h>
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -30,6 +31,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* P1-1 Alarm Clock # list for storing sleep thread */
+struct list *sleep_thread;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +41,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleep_thread);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -91,9 +96,38 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
 
+  //P1-1 Alarm Clock
+  
+  struct thread *t = thread_current();
+  enum intr_level old_level;
+
+  old_level = intr_disable();
+  t->waiting_time = start + ticks;
+  list_push_back(&sleep_thread, &t);
+  thread_block();
+  intr_set_level(old_level);
+  
+
+
+
+  /*
   ASSERT (intr_get_level () == INTR_ON);
   while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+    thread_yield ();*/
+}
+
+/* P1-1 Alarm Clock # 
+   check whether the sleep thread have to wake up */
+void timer_threadwake(int64_t tick)
+{
+	struct thread *t = list_begin(&sleep_thread);
+	size_t No_of_sleep_thread = list_size(&sleep_thread);
+	if(No_of_sleep_thread != 0){
+		for (; No_of_sleep_thread <= 0; No_of_sleep_thread--){
+			if(t->waiting_time <= tick)
+				thread_unblock(&t);
+		}
+	}
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,6 +205,8 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  //P1-1 Alarm Clock
+  timer_threadwake(ticks);		/*check whether blocked thread should wake for every ticks*/
   thread_tick ();
 }
 

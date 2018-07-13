@@ -100,6 +100,9 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+	 /* P1-1 Alarm Clock*/
+	 uint64_t waiting_time;					/* store time to wake up */
   };
 
 /* If false (default), use round-robin scheduler.
